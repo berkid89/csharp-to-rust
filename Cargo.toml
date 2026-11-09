@@ -1,0 +1,21 @@
+[package]
+name = "csharp-to-rust"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Transpile C# source code into equivalent Rust code."
+readme = "README.md"
+repository = "https://github.com/berkid89/csharp-to-rust"
+authors = ["Daniel Berki <berkid89@gmail.com>"]
+
+[lib]
+name = "csharp_to_rust"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cs2rs"
+path = "src/main.rs"
+
+[dependencies]
+tree-sitter = "0.25"
+tree-sitter-c-sharp = "0.23"
