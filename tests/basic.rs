@@ -3,7 +3,25 @@ use std::process::Command;
 const ADD: &str = "pub fn add(a: f32, b: f32) -> f32 {\n    a + b\n}\n";
 
 fn transpile(source: &str) -> Result<String, String> {
-    csharp_to_rust::transpile(source)
+    csharp_to_rust::transpile(source).map_err(|error| error.message().to_string())
+}
+
+#[test]
+fn library_example_uses_question_mark() -> Result<(), Box<dyn std::error::Error>> {
+    let csharp = r#"
+        public static class Calculator {
+            public static int Add(int a, int b) {
+                return a + b;
+            }
+        }
+    "#;
+
+    let rust = csharp_to_rust::transpile(csharp)?;
+    assert_eq!(
+        rust,
+        "pub fn add(a: i32, b: i32) -> i32 {\n    i32::wrapping_add(a, b)\n}\n"
+    );
+    Ok(())
 }
 
 #[test]

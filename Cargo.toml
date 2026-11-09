@@ -2,11 +2,17 @@
 name = "csharp-to-rust"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
 license = "Apache-2.0"
-description = "Transpile C# source code into equivalent Rust code."
+description = "Transpile a small subset of C# into equivalent Rust."
 readme = "README.md"
 repository = "https://github.com/berkid89/csharp-to-rust"
+documentation = "https://docs.rs/csharp-to-rust"
+homepage = "https://github.com/berkid89/csharp-to-rust"
 authors = ["Daniel Berki <berkid89@gmail.com>"]
+keywords = ["csharp", "transpiler", "codegen", "source-to-source"]
+categories = ["compilers", "development-tools", "parser-implementations"]
+exclude = [".github/", ".cursor/"]
 
 [lib]
 name = "csharp_to_rust"
