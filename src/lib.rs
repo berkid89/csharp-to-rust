@@ -33,13 +33,19 @@
 //! That prints one `pub fn`. The class is a C# wrapper and is not emitted.
 //! [`transpile_method`] also returns the method signature and attribute names.
 //!
-//! The public API is [`transpile`], [`transpile_method`], [`Error`],
-//! [`TranspiledMethod`], [`Parameter`], and [`PrimitiveType`].
+//! [`analyze_method`] returns the same checked method as a read-only [`ir::Method`]
+//! without generating Rust. [`emit_rust`] turns that method back into source.
+//! The [`ir`] module is an early API and may change in future 0.x releases.
+//!
+//! The public API is [`transpile`], [`transpile_method`], [`analyze_method`],
+//! [`emit_rust`], [`Error`], [`TranspiledMethod`], [`Parameter`], [`PrimitiveType`],
+//! and the types in [`ir`].
 
 #![deny(missing_docs)]
 
 mod check;
 mod emit;
+pub mod ir;
 
 /// Why transpilation failed.
 ///
@@ -132,6 +138,64 @@ pub fn transpile(source: &str) -> Result<String, Error> {
     transpile_method(source).map(|method| method.rust_source)
 }
 
+/// Analyze C# source into a typed, read-only method.
+///
+/// Parsing, name resolution, and type checking are the same work [`transpile`]
+/// performs. The returned [`ir::Method`] can be inspected or passed to
+/// [`emit_rust`]. This is an early public API and may change in future 0.x
+/// releases.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the source is invalid or outside the supported subset.
+///
+/// # Examples
+///
+/// ```
+/// use csharp_to_rust::{analyze_method, ir::Statement};
+///
+/// let source = r#"
+///     public static class Calculator {
+///         [GpuKernel]
+///         public static float Add(float a, float b) {
+///             return a + b;
+///         }
+///     }
+/// "#;
+///
+/// let method = analyze_method(source)?;
+/// assert_eq!(method.csharp_name(), "Add");
+/// assert_eq!(method.rust_name(), "add");
+/// assert_eq!(method.attributes(), &["GpuKernel".to_string()]);
+/// assert_eq!(method.parameters()[0].csharp_name(), "a");
+/// assert_eq!(method.parameters()[0].rust_name(), "a");
+/// assert!(matches!(&method.body()[0], Statement::Return(_)));
+/// # Ok::<(), csharp_to_rust::Error>(())
+/// ```
+pub fn analyze_method(source: &str) -> Result<ir::Method, Error> {
+    check::check(source).map_err(Error::from)
+}
+
+/// Generate Rust source from a method returned by [`analyze_method`].
+///
+/// The result matches [`transpile`] for the same C# source, including the
+/// trailing newline. Emission does not parse that source again.
+///
+/// # Examples
+///
+/// ```
+/// use csharp_to_rust::{analyze_method, emit_rust};
+///
+/// let source = "public class Box { public static int Id(int value) { return value; } }";
+/// let method = analyze_method(source)?;
+/// let rust = emit_rust(&method);
+/// assert!(rust.contains("pub fn id(value: i32)"));
+/// # Ok::<(), csharp_to_rust::Error>(())
+/// ```
+pub fn emit_rust(method: &ir::Method) -> String {
+    emit::emit(method)
+}
+
 /// Transpile C# source and return the signature, attribute names, and Rust source.
 ///
 /// # Errors
@@ -151,12 +215,19 @@ pub fn transpile(source: &str) -> Result<String, Error> {
 /// # Ok::<(), csharp_to_rust::Error>(())
 /// ```
 pub fn transpile_method(source: &str) -> Result<TranspiledMethod, Error> {
-    let method = check::check(source)?;
-    let rust_source = emit::emit(&method);
+    let method = analyze_method(source)?;
+    let rust_source = emit_rust(&method);
     Ok(TranspiledMethod {
         csharp_name: method.csharp_name,
         rust_name: method.rust_name,
-        parameters: method.parameters,
+        parameters: method
+            .parameters
+            .into_iter()
+            .map(|parameter| Parameter {
+                name: parameter.rust_name,
+                primitive_type: parameter.primitive_type,
+            })
+            .collect(),
         return_type: method.return_type,
         attributes: method.attributes,
         rust_source,

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use super::{Parameter, PrimitiveType};
+use super::PrimitiveType;
+use super::ir::{BinaryOp, Expr, ExprKind, Method, Parameter, Statement, UnaryOp};
 use tree_sitter::{Node, Parser};
 
 impl PrimitiveType {
@@ -26,7 +27,7 @@ const RUST_KEYWORDS: &[&str] = &[
     "typeof", "unsafe", "unsized", "use", "virtual", "where", "while", "yield",
 ];
 
-pub(super) fn check(source: &str) -> Result<CheckedMethod, String> {
+pub(super) fn check(source: &str) -> Result<Method, String> {
     let mut parser = Parser::new();
     parser
         .set_language(&tree_sitter_c_sharp::LANGUAGE.into())
@@ -43,97 +44,6 @@ pub(super) fn check(source: &str) -> Result<CheckedMethod, String> {
     let class = single_class(root)?;
     let method = single_method(class)?;
     check_method(method, source)
-}
-
-pub(super) struct CheckedMethod {
-    pub(super) csharp_name: String,
-    pub(super) rust_name: String,
-    pub(super) parameters: Vec<Parameter>,
-    pub(super) return_type: PrimitiveType,
-    pub(super) attributes: Vec<String>,
-    pub(super) body: Vec<Statement>,
-}
-
-pub(super) enum Statement {
-    Return(Expr),
-    Let(Vec<(String, Expr)>),
-    Block(Vec<Statement>),
-    If {
-        condition: Expr,
-        consequence: Box<Statement>,
-        alternative: Option<Box<Statement>>,
-    },
-}
-
-impl Statement {
-    fn always_returns(&self) -> bool {
-        match self {
-            Self::Return(_) => true,
-            Self::Block(statements) => statements.iter().any(Self::always_returns),
-            Self::If {
-                consequence,
-                alternative,
-                ..
-            } => {
-                consequence.always_returns()
-                    && alternative.as_deref().is_some_and(Self::always_returns)
-            }
-            Self::Let(_) => false,
-        }
-    }
-}
-
-pub(super) struct Expr {
-    pub(super) kind: ExprKind,
-    pub(super) ty: PrimitiveType,
-}
-
-pub(super) enum ExprKind {
-    Name(String),
-    Integer(i32),
-    Real(String),
-    Bool(bool),
-    Group(Box<Expr>),
-    Unary(UnaryOp, Box<Expr>),
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
-}
-
-impl Expr {
-    fn integer(value: i32) -> Self {
-        Self {
-            kind: ExprKind::Integer(value),
-            ty: PrimitiveType::I32,
-        }
-    }
-
-    fn constant_integer(&self) -> Option<i32> {
-        match &self.kind {
-            ExprKind::Integer(value) => Some(*value),
-            ExprKind::Group(inner) => inner.constant_integer(),
-            _ => None,
-        }
-    }
-}
-
-pub(super) enum UnaryOp {
-    Negate,
-    Not,
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Less,
-    LessEqual,
-    Greater,
-    GreaterEqual,
-    Equal,
-    NotEqual,
-    And,
-    Or,
 }
 
 struct Binding<'src> {
@@ -330,7 +240,7 @@ fn single_method(class: Node) -> Result<Node, String> {
     }
 }
 
-fn check_method(method: Node, source: &str) -> Result<CheckedMethod, String> {
+fn check_method(method: Node, source: &str) -> Result<Method, String> {
     require_public_static(method, source)?;
     reject_method_extras(method)?;
 
@@ -360,7 +270,7 @@ fn check_method(method: Node, source: &str) -> Result<CheckedMethod, String> {
         ));
     }
 
-    Ok(CheckedMethod {
+    Ok(Method {
         csharp_name,
         rust_name,
         parameters,
@@ -575,14 +485,11 @@ fn parameter<'src>(
             .ok_or_else(|| format!("parameter is missing a type at {}", location(node)))?,
         source,
     )?;
-    let name = scope.declare(
-        node_text(name_node, source),
-        primitive_type,
-        "parameter",
-        name_node,
-    )?;
+    let csharp_name = node_text(name_node, source);
+    let rust_name = scope.declare(csharp_name, primitive_type, "parameter", name_node)?;
     Ok(Parameter {
-        name,
+        csharp_name: csharp_name.to_string(),
+        rust_name,
         primitive_type,
     })
 }

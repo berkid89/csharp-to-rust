@@ -45,10 +45,54 @@ pub fn add(a: i32, b: i32) -> i32 {
 
 `transpile` returns `Result<String, csharp_to_rust::Error>`. `Error` implements `std::error::Error`, so `?` works with `Box<dyn std::error::Error>`. `transpile_method` returns the same Rust source together with the C# name, the Rust name, the parameters, the return type, and simple attribute names.
 
+To inspect the checked method before generating Rust, see [Using the typed IR API](#using-the-typed-ir-api).
+
 The same program is [`examples/transpile.rs`](examples/transpile.rs):
 
 ```bash
 cargo run --example transpile
+```
+
+## Using the typed IR API
+
+`analyze_method` type-checks one supported method and returns it as a read-only value. `emit_rust` turns that value into the same Rust source `transpile` would return. Callers can read the method name, both the original C# parameter names and the Rust parameter names, attribute names, the statement tree, the expression tree, and the checked type of each expression.
+
+The IR is owned data produced by the semantic checker. Library users can inspect it, but they cannot build or change a method that skipped checking. It is an early public API and may change in future `0.x` releases.
+
+Downstream tools can walk the tree without generating Rust first. Attribute names are labels only. This crate records them and does not interpret them.
+
+```rust
+use csharp_to_rust::ir::{ExprKind, Statement};
+use csharp_to_rust::{analyze_method, emit_rust};
+
+fn main() -> Result<(), csharp_to_rust::Error> {
+    let source = r#"
+        public static class Calculator {
+            [GpuKernel]
+            public static float Add(float a, float b) {
+                return a + b;
+            }
+        }
+    "#;
+
+    let method = analyze_method(source)?;
+    assert_eq!(method.csharp_name(), "Add");
+    assert_eq!(method.rust_name(), "add");
+    assert!(matches!(&method.body()[0], Statement::Return(_)));
+    if let Statement::Return(expr) = &method.body()[0] {
+        assert!(matches!(expr.kind(), ExprKind::Binary(..)));
+    }
+
+    let rust = emit_rust(&method);
+    assert!(rust.contains("pub fn add(a: f32, b: f32) -> f32"));
+    Ok(())
+}
+```
+
+The runnable sample is [`examples/ir.rs`](examples/ir.rs):
+
+```bash
+cargo run --example ir
 ```
 
 ## Command line
@@ -126,6 +170,10 @@ csharp-to-rust is early. The subset in [Currently supported](#currently-supporte
 
 The long-term goal is a general-purpose C# to Rust transpiler: one that can take larger programs and produce Rust that keeps their behavior, on its own or inside another tool. New syntax is added one subset at a time, and only after it is checked and tested.
 
+### Done
+
+- [x] Public typed IR. `analyze_method` returns a read-only, type-checked method, and `emit_rust` emits the same Rust as `transpile`. This API may change in `0.x` releases.
+
 ### Near term
 
 - [ ] Reassignment, uninitialized locals, and increment or decrement
@@ -158,11 +206,13 @@ Contributions and feedback are welcome. [Development](#development) describes ho
 
 ```text
 src/lib.rs                 public library API (`csharp_to_rust`)
+src/ir.rs                  typed, read-only method IR
 src/check.rs               C# parsing, name resolution, and validation
-src/emit.rs                Rust generation from checked methods
+src/emit.rs                Rust generation from the typed IR
 src/main.rs                command-line tool (`cs2rs`)
-tests/                     integration tests
+tests/                     integration tests, including `tests/ir.rs`
 examples/transpile.rs      library usage sample
+examples/ir.rs             typed IR sample
 examples/add.cs            arithmetic sample
 examples/relu.cs           conditional sample
 examples/weighted_sum.cs   local-variable sample

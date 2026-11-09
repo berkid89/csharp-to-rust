@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use super::PrimitiveType;
-use super::check::{BinaryOp, CheckedMethod, Expr, ExprKind, Statement, UnaryOp};
+use super::ir::{BinaryOp, Expr, ExprKind, Method, Statement, UnaryOp};
 
 impl PrimitiveType {
     fn rust(self) -> &'static str {
@@ -14,7 +14,7 @@ impl PrimitiveType {
     }
 }
 
-pub(super) fn emit(method: &CheckedMethod) -> String {
+pub(super) fn emit(method: &Method) -> String {
     let mut out = format!("pub fn {}(", method.rust_name);
     for (index, parameter) in method.parameters.iter().enumerate() {
         if index > 0 {
@@ -23,7 +23,7 @@ pub(super) fn emit(method: &CheckedMethod) -> String {
         write!(
             out,
             "{}: {}",
-            parameter.name,
+            parameter.rust_name,
             parameter.primitive_type.rust()
         )
         .unwrap();
