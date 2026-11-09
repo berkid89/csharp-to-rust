@@ -51,13 +51,6 @@ The same program is [`examples/transpile.rs`](examples/transpile.rs):
 cargo run --example transpile
 ```
 
-Until version 0.1.0 is on crates.io, depend on this repository instead of `cargo add`:
-
-```toml
-[dependencies]
-csharp-to-rust = { git = "https://github.com/berkid89/csharp-to-rust" }
-```
-
 ## Command line
 
 Install Rustup and Cargo by following the instructions at [rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
@@ -69,7 +62,7 @@ cargo run --bin cs2rs -- examples/add.cs
 cargo test
 ```
 
-After the crate is published, `cargo install csharp-to-rust` installs the `cs2rs` binary. From this checkout, `cargo install --path .` does the same.
+`cargo install csharp-to-rust` installs the `cs2rs` binary. From this checkout, `cargo install --path .` does the same.
 
 `examples/add.cs` prints:
 
@@ -188,19 +181,9 @@ Put translation logic in the library and add tests under `tests/` for the behavi
 
 ### Publish
 
-The first release is published from your machine. [Trusted publishing](https://crates.io/docs/trusted-publishing) can be configured only after the crate exists on crates.io.
+Releases go through [`.github/workflows/publish.yml`](.github/workflows/publish.yml). That workflow is separate from CI. It runs when a `v*` tag is pushed, checks that the tag matches `version` in `Cargo.toml`, runs the tests, then publishes with [trusted publishing](https://crates.io/docs/trusted-publishing).
 
-```bash
-cargo login
-cargo publish --dry-run
-cargo publish
-```
-
-`cargo login` takes an API token from [crates.io/settings/tokens](https://crates.io/settings/tokens). Publishing `0.1.0` is what makes `cargo add csharp-to-rust` resolve for everyone. A published version number cannot be reused. Yank it if it must be hidden.
-
-Later releases go through [`.github/workflows/publish.yml`](.github/workflows/publish.yml). That workflow is separate from CI. It runs when a `v*` tag is pushed, checks that the tag matches `version` in `Cargo.toml`, runs the tests, then publishes.
-
-After `0.1.0` is on crates.io, open the crate's Settings → Trusted Publishing and add GitHub with:
+On the crate's Settings → Trusted Publishing page, GitHub uses:
 
 | Field | Value |
 | --- | --- |
@@ -209,12 +192,14 @@ After `0.1.0` is on crates.io, open the crate's Settings → Trusted Publishing 
 | Workflow filename | `publish.yml` |
 | Environment | leave empty |
 
-Then bump the version, commit it, and push a matching tag:
+Bump the version, commit it, and push a matching tag:
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
+
+A published version number cannot be reused. Yank it if it must be hidden.
 
 ## License
 
