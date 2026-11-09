@@ -231,7 +231,7 @@ Put translation logic in the library and add tests under `tests/` for the behavi
 
 ### Publish
 
-Releases go through [`.github/workflows/publish.yml`](.github/workflows/publish.yml). That workflow is separate from CI. It runs when a `v*` tag is pushed, checks that the tag matches `version` in `Cargo.toml`, runs the tests, then publishes with [trusted publishing](https://crates.io/docs/trusted-publishing).
+Releases go through [`.github/workflows/publish.yml`](.github/workflows/publish.yml). That workflow is separate from CI. It runs when a `v*` tag is pushed, or when you start **Publish to crates.io** from the Actions tab. A tag run checks that the tag matches `version` in `Cargo.toml`. Both paths run the tests, then publish with [trusted publishing](https://crates.io/docs/trusted-publishing).
 
 On the crate's Settings → Trusted Publishing page, GitHub uses:
 
@@ -242,12 +242,14 @@ On the crate's Settings → Trusted Publishing page, GitHub uses:
 | Workflow filename | `publish.yml` |
 | Environment | leave empty |
 
-Bump the version, commit it, and push a matching tag:
+Bump the version and commit it. Then either push a matching tag:
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
+
+or open the Actions tab, choose **Publish to crates.io**, and run it on the branch that contains that version. The manual form lists branches, so the workflow file has to be on the default branch before it appears there.
 
 A published version number cannot be reused. Yank it if it must be hidden.
 

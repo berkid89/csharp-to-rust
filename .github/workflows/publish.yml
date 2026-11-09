@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -19,6 +20,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check tag matches crate version
+        if: github.event_name == 'push'
         shell: bash
         run: |
           tag="${GITHUB_REF_NAME#v}"
