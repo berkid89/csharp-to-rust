@@ -41,6 +41,32 @@ fn analyzes_attributed_addition() {
 }
 
 #[test]
+fn analyzes_expression_bodied_method() {
+    let method = analyze_method(
+        r#"
+        public static class Calculator {
+            [GpuKernel]
+            public static float Add(float a, float b) => a + b;
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(method.csharp_name(), "Add");
+    assert_eq!(method.attributes(), &["GpuKernel".to_string()]);
+    assert_eq!(method.body().len(), 1);
+    let Statement::Return(expr) = &method.body()[0] else {
+        panic!("expected a return, got {:?}", method.body());
+    };
+    assert_eq!(expr.ty(), PrimitiveType::F32);
+    assert!(matches!(expr.kind(), ExprKind::Binary(BinaryOp::Add, ..)));
+    assert_eq!(
+        emit_rust(&method),
+        "pub fn add(a: f32, b: f32) -> f32 {\n    a + b\n}\n"
+    );
+}
+
+#[test]
 fn analyzes_relu_if() {
     let method = analyze_method(include_str!("../examples/relu.cs")).unwrap();
     assert_eq!(method.csharp_name(), "Relu");

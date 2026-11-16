@@ -151,6 +151,7 @@ One `public static` method inside a class. The class is only a C# wrapper and is
 - Simple method attributes such as `[GpuKernel]`. Names are kept as metadata and are not written into the Rust.
 - Initialized local variables with an explicit primitive type, for example `float weighted = a * weight;`.
 - `if`, `else`, and nested blocks, including `return` inside a branch.
+- Expression-bodied methods, for example `public static int Add(int a, int b) => a + b;`. The expression is checked against the return type and emitted like a method whose body is a single `return`.
 - Expressions made of parameters, locals, numeric and boolean literals, parentheses, `+`, `-`, `*`, `/`, comparisons (`<`, `<=`, `>`, `>=`, `==`, `!=`), `&&`, `||`, and unary `!` and `-`.
 - A public method becomes `pub fn`, and a PascalCase name becomes snake_case (`WeightedSum` → `weighted_sum`).
 - Simple numeric suffixes such as `2.0f` → `2.0f32`.
@@ -177,7 +178,8 @@ The long-term goal is a general-purpose C# to Rust transpiler: one that can take
 ### Near term
 
 - [ ] Reassignment, uninitialized locals, and increment or decrement
-- [ ] `void` methods and expression-bodied methods
+- [x] Expression-bodied methods
+- [ ] `void` methods
 - [ ] More than one method in a class
 - [ ] Method calls and member access
 - [ ] Arrays and indexing

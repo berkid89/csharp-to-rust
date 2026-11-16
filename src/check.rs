@@ -262,13 +262,18 @@ fn check_method(method: Node, source: &str) -> Result<Method, String> {
     let mut scope = Scope::new();
     let parameters = parameters(method, source, &mut scope)?;
     let body = method_body(method)?;
-    let statements = check_statements(body, source, &mut scope, return_type)?;
-    if !statements.iter().any(Statement::always_returns) {
-        return Err(format!(
-            "method does not return a value on every path at {}",
-            location(body)
-        ));
-    }
+    let statements = if body.kind() == "arrow_expression_clause" {
+        check_expression_body(body, source, &scope, return_type)?
+    } else {
+        let statements = check_statements(body, source, &mut scope, return_type)?;
+        if !statements.iter().any(Statement::always_returns) {
+            return Err(format!(
+                "method does not return a value on every path at {}",
+                location(body)
+            ));
+        }
+        statements
+    };
 
     Ok(Method {
         csharp_name,
@@ -284,10 +289,7 @@ fn method_body(method: Node) -> Result<Node, String> {
     let body = method
         .child_by_field_name("body")
         .ok_or_else(|| "method must contain a body".to_string())?;
-    if body.kind() == "arrow_expression_clause" {
-        return Err("expression-bodied methods are not supported; use a block body".to_string());
-    }
-    if body.kind() != "block" {
+    if body.kind() != "block" && body.kind() != "arrow_expression_clause" {
         return Err(format!(
             "unsupported method body '{}' at {}",
             body.kind(),
@@ -385,8 +387,14 @@ fn require_public_static(method: Node, source: &str) -> Result<(), String> {
 fn reject_method_extras(method: Node) -> Result<(), String> {
     for child in significant_children(method) {
         match child.kind() {
-            "attribute_list" | "modifier" | "predefined_type" | "identifier" | "parameter_list"
-            | "block" | "type" => {}
+            "attribute_list"
+            | "modifier"
+            | "predefined_type"
+            | "identifier"
+            | "parameter_list"
+            | "block"
+            | "arrow_expression_clause"
+            | "type" => {}
             "type_parameter_list" | "type_parameter_constraints_clause" => {
                 return Err(format!(
                     "generic methods are not supported at {}",
@@ -398,11 +406,6 @@ fn reject_method_extras(method: Node) -> Result<(), String> {
                     "explicit interface methods are not supported at {}",
                     location(child)
                 ));
-            }
-            "arrow_expression_clause" => {
-                return Err(
-                    "expression-bodied methods are not supported; use a block body".to_string(),
-                );
             }
             other => {
                 return Err(format!(
@@ -505,6 +508,18 @@ fn return_value(statement: Node) -> Result<Node, String> {
                 location(statement)
             )
         })
+}
+
+fn check_expression_body(
+    body: Node,
+    source: &str,
+    scope: &Scope<'_>,
+    return_type: PrimitiveType,
+) -> Result<Vec<Statement>, String> {
+    let expression = only_significant_child(body)?;
+    let expr = check_expression(expression, source, scope)?;
+    expect_type(expr.ty, return_type, expression)?;
+    Ok(vec![Statement::Return(expr)])
 }
 
 fn check_statements<'src>(

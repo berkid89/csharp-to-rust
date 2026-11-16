@@ -48,6 +48,34 @@ fn preserves_parentheses_around_addition() {
 }
 
 #[test]
+fn transpiles_expression_bodied_method() {
+    let source = r#"
+        public class Math
+        {
+            [GpuKernel]
+            public static int Add(int a, int b) => a + b;
+        }
+    "#;
+    assert_eq!(
+        transpile(source).unwrap(),
+        "pub fn add(a: i32, b: i32) -> i32 {\n    i32::wrapping_add(a, b)\n}\n"
+    );
+
+    let mismatch = transpile(
+        r#"
+        public class Box {
+            public static int Id(float value) => value;
+        }
+        "#,
+    )
+    .unwrap_err();
+    assert!(
+        mismatch.contains("cannot use float where int is required"),
+        "expected a type error, got {mismatch}"
+    );
+}
+
+#[test]
 fn maps_primitive_parameter_and_return_types() {
     assert_eq!(
         transpile(
